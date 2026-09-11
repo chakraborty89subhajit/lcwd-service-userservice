@@ -45,7 +45,7 @@ public class UserServiceImpl implements UserService {
                 try {
                     // 1. Fetch ratings for the current user
                     Rating[] ratingOfUser = restTemplate.getForObject(
-                            "http://localhost:8083/ms/rating/users/" + user.getId(), Rating[].class);
+                            "http://RATINGSERVICE/ms/rating/users/" + user.getId(), Rating[].class);
 
                     if (ratingOfUser != null && ratingOfUser.length > 0) {
                         List<Rating> ratingList = new ArrayList<>();
@@ -55,7 +55,7 @@ public class UserServiceImpl implements UserService {
                             if (rating != null && rating.getHotelId() != null) {
                                 try {
                                     ResponseEntity<Hotel> forEntity = restTemplate.getForEntity(
-                                            "http://localhost:8082/hotels/" + rating.getHotelId(), Hotel.class);
+                                            "http://HOTELSERVICE/hotels/" + rating.getHotelId(), Hotel.class);
 
                                     Hotel hotel = forEntity.getBody();
                                     rating.setHotel(hotel);
@@ -78,29 +78,40 @@ public class UserServiceImpl implements UserService {
 
             return userList;
         }
-    
+
 
     //get single user
     @Override
     public User getUser(String userId) {
-        User user = userRepo.findById(userId).orElseThrow(()->
-                new ResourceNotFoundException("user id invalid"));
+        User user = userRepo.findById(userId).orElseThrow(() ->
+                new ResourceNotFoundException("User not found with id: " + userId));
 
-        Rating[] ratingOfUser = restTemplate.getForObject
-                ("http://localhost:8083/ms/rating/users/"+user.getId(),Rating[].class);
-        logger.info("{}",ratingOfUser);
-        List<Rating> ratings= Arrays.stream(ratingOfUser).collect(Collectors.toList());
-        List<Rating> ratingList = ratings.stream()
-                        .map(rating -> {
-                            ResponseEntity<Hotel> forEntity = restTemplate.getForEntity(
-                                    "http://localhost:8082/hotels/"+rating.getHotelId(), Hotel.class);
-                           Hotel hotel =forEntity.getBody();
-                            logger.info("response status coe : {}",forEntity.getStatusCode());
-                            rating.setHotel(hotel);
-                            return rating;
-                        }).collect(Collectors.toList());
+        try {
+            // Calling via Eureka Service Name
+            Rating[] ratingsOfUser = restTemplate.getForObject(
+                    "http://RATINGSERVICE/ms/rating/users/" + user.getId(), Rating[].class);
 
-        user.setRating(ratings);
+            if (ratingsOfUser != null) {
+                List<Rating> ratingList = new ArrayList<>();
+
+                for (Rating rating : ratingsOfUser) {
+                    try {
+                        ResponseEntity<Hotel> forEntity = restTemplate.getForEntity(
+                                "http://HOTELSERVICE/hotels/" + rating.getHotelId(), Hotel.class);
+
+                        rating.setHotel(forEntity.getBody());
+                    } catch (Exception e) {
+                        logger.error("Failed to fetch hotel {}: {}", rating.getHotelId(), e.getMessage());
+                        rating.setHotel(null);
+                    }
+                    ratingList.add(rating);
+                }
+                user.setRating(ratingList);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to fetch ratings for user {}: {}", userId, e.getMessage());
+            user.setRating(new ArrayList<>()); // Fallback to empty list
+        }
 
         return user;
     }
