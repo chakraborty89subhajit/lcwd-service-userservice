@@ -4,6 +4,7 @@ import com.lcwd.user.service.userservice.Excxeption.ResourceNotFoundException;
 import com.lcwd.user.service.userservice.entity.Hotel;
 import com.lcwd.user.service.userservice.entity.Rating;
 import com.lcwd.user.service.userservice.entity.User;
+import com.lcwd.user.service.userservice.external.service.HotelService;
 import com.lcwd.user.service.userservice.repo.UserRepo;
 import com.lcwd.user.service.userservice.service.UserService;
 import org.slf4j.Logger;
@@ -25,6 +26,9 @@ public class UserServiceImpl implements UserService {
     private UserRepo userRepo;
    @Autowired
    private RestTemplate restTemplate;
+
+   @Autowired
+   private HotelService hotelService;
 
    private Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
     @Override
@@ -54,10 +58,11 @@ public class UserServiceImpl implements UserService {
                             // Check for valid hotelId before calling HotelService
                             if (rating != null && rating.getHotelId() != null) {
                                 try {
-                                    ResponseEntity<Hotel> forEntity = restTemplate.getForEntity(
-                                            "http://HOTELSERVICE/hotels/" + rating.getHotelId(), Hotel.class);
+                                   // ResponseEntity<Hotel> forEntity = restTemplate.getForEntity(
+                                     //       "http://HOTELSERVICE/hotels/" + rating.getHotelId(), Hotel.class);
 
-                                    Hotel hotel = forEntity.getBody();
+                                   Hotel hotel =hotelService.getHotel(rating.getHotelId());
+                                    //Hotel hotel = forEntity.getBody();
                                     rating.setHotel(hotel);
                                 } catch (Exception e) {
                                     logger.error("Failed to fetch hotel with ID {}: {}", rating.getHotelId(), e.getMessage());
@@ -96,10 +101,13 @@ public class UserServiceImpl implements UserService {
 
                 for (Rating rating : ratingsOfUser) {
                     try {
-                        ResponseEntity<Hotel> forEntity = restTemplate.getForEntity(
-                                "http://HOTELSERVICE/hotels/" + rating.getHotelId(), Hotel.class);
+                        //ResponseEntity<Hotel> forEntity = restTemplate.getForEntity(
+                          //      "http://HOTELSERVICE/hotels/" + rating.getHotelId(), Hotel.class);
 
-                        rating.setHotel(forEntity.getBody());
+                        Hotel hotel = hotelService.getHotel(rating.getHotelId());
+
+                        //rating.setHotel(forEntity.getBody());
+                        rating.setHotel(hotel);
                     } catch (Exception e) {
                         logger.error("Failed to fetch hotel {}: {}", rating.getHotelId(), e.getMessage());
                         rating.setHotel(null);
