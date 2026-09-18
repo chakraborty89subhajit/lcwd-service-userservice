@@ -88,37 +88,31 @@ public class UserServiceImpl implements UserService {
     //get single user
     @Override
     public User getUser(String userId) {
+
         User user = userRepo.findById(userId).orElseThrow(() ->
                 new ResourceNotFoundException("User not found with id: " + userId));
 
         try {
-            // Calling via Eureka Service Name
+
             Rating[] ratingsOfUser = restTemplate.getForObject(
-                    "http://RATINGSERVICE/ms/rating/users/" + user.getId(), Rating[].class);
+                    "http://RATINGSERVICE/ms/rating/users/" + user.getId(),
+                    Rating[].class);
 
             if (ratingsOfUser != null) {
-                List<Rating> ratingList = new ArrayList<>();
+                List<Rating> ratingList = Arrays.stream(ratingsOfUser)
+                        .map(rating -> {
+                            Hotel hotel = hotelService.getHotel(rating.getHotelId());
+                            rating.setHotel(hotel);
+                            return rating;
+                        })
+                        .collect(Collectors.toList());
 
-                for (Rating rating : ratingsOfUser) {
-                    try {
-                        //ResponseEntity<Hotel> forEntity = restTemplate.getForEntity(
-                          //      "http://HOTELSERVICE/hotels/" + rating.getHotelId(), Hotel.class);
-
-                        Hotel hotel = hotelService.getHotel(rating.getHotelId());
-
-                        //rating.setHotel(forEntity.getBody());
-                        rating.setHotel(hotel);
-                    } catch (Exception e) {
-                        logger.error("Failed to fetch hotel {}: {}", rating.getHotelId(), e.getMessage());
-                        rating.setHotel(null);
-                    }
-                    ratingList.add(rating);
-                }
                 user.setRating(ratingList);
             }
+
         } catch (Exception e) {
             logger.error("Failed to fetch ratings for user {}: {}", userId, e.getMessage());
-            user.setRating(new ArrayList<>()); // Fallback to empty list
+            throw e;   // Circuit Breaker will invoke fallback
         }
 
         return user;
