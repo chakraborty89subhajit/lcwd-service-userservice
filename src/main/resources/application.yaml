@@ -36,6 +36,14 @@ resilience4j:
         maxAttampts: 3
         waitDuration: 5s
 
+
+  ratelimiter:
+    instances:
+      userRateLimiter:
+        limit-refresh-period: 4s
+        limit-for-period: 2
+        timeout-duration: 2s
+
 spring:
   application:
     name: userservice
